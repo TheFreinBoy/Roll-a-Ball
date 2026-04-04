@@ -1,65 +1,113 @@
 using UnityEngine;
+using UnityEngine.InputSystem; 
+using TMPro;
 
 [RequireComponent(typeof(Rigidbody))]
 public class SphereController : MonoBehaviour
 {
+    public TextMeshProUGUI countText;
+    public GameObject winTextObject;
+    
     [Header("Movement")]
-    public float speed = 10f;
+    public float speed = 40f;      // Силу можно сделать больше для резкого старта
+    public float maxSpeed = 10f;   // Ограничитель скорости (чтобы не улетал в космос)
     public float jumpForce = 5f;
     
     [Header("Camera Reference")]
-    public Transform cameraTransform; // Ссылка на трансформ камеры
+    public Transform cameraTransform;
 
     private Rigidbody rb;
     private bool isGrounded;
+    
+    private Vector2 moveInput;
+    private int count;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
         
-        // Если камеру забыли назначить в инспекторе, скрипт найдет главную камеру сам
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous; 
+
         if (cameraTransform == null && Camera.main != null)
         {
             cameraTransform = Camera.main.transform;
         }
+        count = 0;
+        SetCountText();
+        winTextObject.SetActive(false);
     }
 
-    void FixedUpdate()
+    public void OnMove(InputValue value)
     {
-        float moveHorizontal = Input.GetAxis("Horizontal"); 
-        float moveVertical = Input.GetAxis("Vertical");    
-
-        // Получаем векторы направления камеры
-        Vector3 camForward = cameraTransform.forward;
-        Vector3 camRight = cameraTransform.right;
-
-        // Обнуляем ось Y, чтобы шар двигался только в горизонтальной плоскости
-        camForward.y = 0f;
-        camRight.y = 0f;
-
-        // Нормализуем векторы, чтобы скорость не менялась при разном угле наклона камеры
-        camForward.Normalize();
-        camRight.Normalize();
-
-        // Высчитываем итоговый вектор движения относительно камеры
-        Vector3 movement = (camForward * moveVertical) + (camRight * moveHorizontal);
-
-        rb.AddForce(movement * speed);
+        moveInput = value.Get<Vector2>();
     }
 
-    void Update()
+    public void OnJump(InputValue value)
     {
-        if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
+        if (value.isPressed && isGrounded)
         {
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
             isGrounded = false; 
         }
     }
 
+    void FixedUpdate()
+    {
+        Vector3 camForward = cameraTransform.forward;
+        Vector3 camRight = cameraTransform.right;
+
+        camForward.y = 0f;
+        camRight.y = 0f;
+
+        camForward.Normalize();
+        camRight.Normalize();
+
+        Vector3 movement = (camForward * moveInput.y) + (camRight * moveInput.x);
+
+        rb.AddForce(movement * speed);
+
+        Vector3 flatVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+        
+        if (flatVelocity.magnitude > maxSpeed)
+        {
+            Vector3 limitedVelocity = flatVelocity.normalized * maxSpeed;
+            rb.linearVelocity = new Vector3(limitedVelocity.x, rb.linearVelocity.y, limitedVelocity.z);
+        }
+    }
+
     void OnCollisionEnter(Collision collision)
     {
-        // Простая проверка на землю (в идеале стоит проверять теги или слои, 
-        // чтобы шар не мог прыгать от стен)
-        isGrounded = true;
+
+        if (collision.contacts.Length > 0 && collision.contacts[0].normal.y > 0.5f)
+        {
+            isGrounded = true;
+        }
+
+        if (collision.gameObject.CompareTag("Enemy"))
+        {
+            Destroy(gameObject); 
+            winTextObject.SetActive(true);
+            winTextObject.GetComponent<TextMeshProUGUI>().text = "You Lose!";
+        }
+    }
+    
+    void OnTriggerEnter(Collider other) 
+    {
+        if (other.gameObject.CompareTag("PickUp")) 
+        {
+            other.gameObject.SetActive(false);
+            count = count + 1;
+            SetCountText();
+        }
+    }
+    
+    void SetCountText() 
+    {
+        countText.text = "" + count.ToString();
+        if (count >= 13) 
+        {
+            winTextObject.SetActive(true);
+            Destroy(GameObject.FindGameObjectWithTag("Enemy"));
+        }
     }
 }
