@@ -9,9 +9,13 @@ public class SphereController : MonoBehaviour
     public GameObject winTextObject;
     
     [Header("Movement")]
-    public float speed = 40f;      // Силу можно сделать больше для резкого старта
-    public float maxSpeed = 10f;   // Ограничитель скорости (чтобы не улетал в космос)
+    public float speed = 40f;      
+    public float maxSpeed = 10f;   
     public float jumpForce = 5f;
+
+    [Header("Boost Settings")]
+    public float maxSpeedBoost = 5f; // На сколько увеличится лимит скорости
+    public float speedAccelerationBoost = 20f; // На сколько увеличится сила разгона
     
     [Header("Camera Reference")]
     public Transform cameraTransform;
@@ -93,11 +97,24 @@ public class SphereController : MonoBehaviour
     
     void OnTriggerEnter(Collider other) 
     {
+        // Подбор обычных монеток
         if (other.gameObject.CompareTag("PickUp")) 
         {
             other.gameObject.SetActive(false);
             count = count + 1;
             SetCountText();
+        }
+        // Подбор бутылька со скоростью
+        else if (other.gameObject.CompareTag("SpeedPotion"))
+        {
+            other.gameObject.SetActive(false); // Прячем бутылёк
+            
+            // Увеличиваем скорость
+            maxSpeed += maxSpeedBoost;
+            speed += speedAccelerationBoost;
+            
+            // Можно добавить Debug.Log, чтобы видеть в консоли, что буст сработал
+            Debug.Log("Speed Boosted! New Max Speed: " + maxSpeed);
         }
     }
     
